@@ -1,0 +1,99 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOC Formatter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>TOC Formatter</h1>
+    <p>Paste your Table of Contents below and click "Format TOC" to get the desired output.</p>
+    <textarea id="tocInput" placeholder="Enter your TOC here...&#10;Example:&#10;1. Main Point&#10;1.1 Sub Point&#10;1.1.1 Sub-sub Point"></textarea>
+    <button onclick="formatTOC()">Format TOC</button>
+    <h2>Formatted TOC:</h2>
+    <pre id="formattedTOC"></pre>
+
+    <script>
+        function formatTOC() {
+            const inputElement = document.getElementById('tocInput');
+            const outputElement = document.getElementById('formattedTOC');
+
+            // Reset the output area
+            outputElement.textContent = "";
+
+            // Get the input and split it into lines
+            const input = inputElement.value.trim();
+            const lines = input.split('\n');
+            let formattedTOC = [];
+            let previousDotCount = 0;
+
+            lines.forEach(line => {
+                // Skip empty lines
+                if (!line.trim()) return;
+
+                // Count dots to determine the level
+                const dotCount = (line.match(/\./g) || []).length;
+                
+                // Format based on the pattern
+                if (/^\d+\.\s/.test(line)) {
+                    // Main points (e.g., "1.", "2.")
+                    if (previousDotCount > 1) {
+                        formattedTOC.push(""); // Add space after sub-subpoints
+                    }
+                    formattedTOC.push(`<strong>${line.trim()}</strong>`);
+                    formattedTOC.push(""); // Add space after main points
+                } 
+                else if (/^\d+\.\d+\s/.test(line) && dotCount === 1) {
+                    // Subpoints (e.g., "1.1", "2.1")
+                    formattedTOC.push(line.trim());
+                } 
+                else if (dotCount >= 2) {
+                    // Sub-subpoints (e.g., "1.1.1", "1.1.1.1")
+                    formattedTOC.push(`<em>${line.trim()}</em>`);
+                }
+
+                previousDotCount = dotCount;
+            });
+
+            // Remove trailing empty lines
+            while (formattedTOC[formattedTOC.length - 1] === "") {
+                formattedTOC.pop();
+            }
+
+            // Join and display the formatted TOC
+            outputElement.textContent = formattedTOC.join('\n');
+        }
+    </script>
+</body>
+</html>
