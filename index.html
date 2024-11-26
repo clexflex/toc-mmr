@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,6 +8,7 @@
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
+            min-height: 80vh;
         }
         textarea {
             width: 100%;
@@ -33,67 +33,178 @@
             border-radius: 5px;
             white-space: pre-wrap;
             word-wrap: break-word;
+            min-height: 300px;
+        }
+        .button-group {
+            margin: 10px 0;
+        }
+        
+        #messageBox {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
     </style>
 </head>
 <body>
     <h1>TOC Formatter</h1>
     <p>Paste your Table of Contents below and click "Format TOC" to get the desired output.</p>
-    <textarea id="tocInput" placeholder="Enter your TOC here...&#10;Example:&#10;1. Main Point&#10;1.1 Sub Point&#10;1.1.1 Sub-sub Point"></textarea>
-    <button onclick="formatTOC()">Format TOC</button>
+    
+    <div class="controls">
+        <label>
+            <input type="checkbox" id="trimWhitespace" checked> 
+            Remove extra whitespace
+        </label>
+    </div>
+
+    <textarea id="tocInput" placeholder="Enter your TOC here...&#10;Example:&#10;1. Introduction&#10;1.1 Background&#10;2. Methodology"></textarea>
+    
+    <div class="button-group">
+        <button onclick="formatTOC()">Format TOC</button>
+       
+        <button onclick="clearAll()">Clear All</button>
+    </div>
+
+    <div id="messageBox"></div>
     <h2>Formatted TOC:</h2>
     <pre id="formattedTOC"></pre>
 
     <script>
+        function showMessage(message, type) {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = message;
+            messageBox.className = type;
+            messageBox.style.display = 'block';
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000);
+        }
+
+        function clearAll() {
+            document.getElementById('tocInput').value = '';
+            document.getElementById('formattedTOC').textContent = '';
+            showMessage('Content cleared!', 'success');
+        }
+
+        function stripTags(html) {
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            return temp.textContent || temp.innerText;
+        }
+
+        function copyToClipboard() {
+            const outputElement = document.getElementById('formattedTOC');
+            if (!outputElement.textContent.trim()) {
+                showMessage('Nothing to copy! Please format some content first.', 'error');
+                return;
+            }
+
+            const formattedText = outputElement.textContent;
+            const plainText = stripTags(formattedText);
+
+            navigator.clipboard.writeText(plainText)
+                .then(() => showMessage('Formatted text copied to clipboard!', 'success'))
+                .catch(() => showMessage('Failed to copy. Please try selecting and copying manually.', 'error'));
+        }
+
+        function getMainSection(number) {
+            return number.split('.')[0];
+        }
+
         function formatTOC() {
             const inputElement = document.getElementById('tocInput');
             const outputElement = document.getElementById('formattedTOC');
+            const trimWhitespace = document.getElementById('trimWhitespace').checked;
 
-            // Reset the output area
             outputElement.textContent = "";
 
-            // Get the input and split it into lines
             const input = inputElement.value.trim();
+            if (!input) {
+                showMessage('Please enter some content to format.', 'error');
+                return;
+            }
+
             const lines = input.split('\n');
             let formattedTOC = [];
-            let previousDotCount = 0;
+            let previousMainSection = null;
 
-            lines.forEach(line => {
-                // Skip empty lines
+            lines.forEach((line) => {
                 if (!line.trim()) return;
 
-                // Count dots to determine the level
-                const dotCount = (line.match(/\./g) || []).length;
+                let cleanedLine = trimWhitespace ? line.replace(/\s+/g, ' ').trim() : line.trim();
                 
-                // Format based on the pattern
-                if (/^\d+\.\s/.test(line)) {
-                    // Main points (e.g., "1.", "2.")
-                    if (previousDotCount > 1) {
-                        formattedTOC.push(""); // Add space after sub-subpoints
-                    }
-                    formattedTOC.push(`<strong>${line.trim()}</strong>`);
-                    formattedTOC.push(""); // Add space after main points
-                } 
-                else if (/^\d+\.\d+\s/.test(line) && dotCount === 1) {
-                    // Subpoints (e.g., "1.1", "2.1")
-                    formattedTOC.push(line.trim());
-                } 
-                else if (dotCount >= 2) {
-                    // Sub-subpoints (e.g., "1.1.1", "1.1.1.1")
-                    formattedTOC.push(`<em>${line.trim()}</em>`);
+                // Extract the number at the start of the line
+                const numberMatch = cleanedLine.match(/^(\d+(\.\d+)*)/);
+                if (!numberMatch) return;
+                
+                const currentNumber = numberMatch[1];
+                const currentMainSection = getMainSection(currentNumber);
+                const dotCount = (currentNumber.match(/\./g) || []).length;
+
+                // Add space between different main sections (e.g., between 2.x and 3.x)
+                if (previousMainSection !== null && 
+                    currentMainSection !== previousMainSection && 
+                    dotCount === 0) { // Only add space when transitioning to a new main section
+                    formattedTOC.push('');
                 }
 
-                previousDotCount = dotCount;
+                // Format based on the pattern
+                if (dotCount === 0) {
+                    // Main points (e.g., "1.", "2.")
+                    formattedTOC.push(`<strong>${cleanedLine}</strong>`);
+                } 
+                else if (dotCount === 1) {
+                    // Subpoints (e.g., "1.1", "2.1")
+                    formattedTOC.push(cleanedLine);
+                } 
+                else {
+                    // Sub-subpoints (e.g., "1.1.1", "1.1.1.1")
+                    formattedTOC.push(`<em>${cleanedLine}</em>`);
+                }
+
+                // Update previous main section
+                if (dotCount === 0) {
+                    previousMainSection = currentMainSection;
+                }
             });
 
             // Remove trailing empty lines
-            while (formattedTOC[formattedTOC.length - 1] === "") {
+            while (formattedTOC[formattedTOC.length - 1] === '') {
                 formattedTOC.pop();
             }
 
-            // Join and display the formatted TOC
-            outputElement.textContent = formattedTOC.join('\n');
+            const formatted = formattedTOC.join('\n');
+            outputElement.textContent = formatted;
+
+            if (formatted) {
+                showMessage('TOC formatted successfully!', 'success');
+            } else {
+                showMessage('No valid TOC entries found in input.', 'error');
+            }
         }
+
+        
     </script>
+    <footer style="text-align: center; margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-top: 1px solid #ddd;">
+    <p>Created by <strong>Yashraj Ghosalkar</strong></p>
+    <p>
+        <a href="https://brandbudd.com/toc-formatter" target="_blank" style="margin-right: 15px;">TOC Formatter</a>
+        <a href="https://github.com/clexflex" target="_blank" style="margin-right: 15px;">GitHub</a>
+        <a href="https://www.linkedin.com/in/yashrajghosalkar/" target="_blank">LinkedIn</a>
+    </p>
+</footer>
 </body>
 </html>
